@@ -54,7 +54,7 @@ const AREAS = {
 };
 
 // URL Google Apps Script (hardcoded, tidak bisa diubah dari UI)
-const GAS_URL = "https://script.google.com/macros/s/AKfycbx5ldkn8uUOplo2F2rKD9OOjARjIZCRIcPYhu_tK7UCWsR1DlnVFShQSuGoxCkW1t4i/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzofpxOD2tpB4IQeL4uUeSoKfJeHzAt3VjACo2wHwrLCmW5Dlo973wadOKDUl_MigK4pQ/exec";
 
 let lastData = {}, currentInput = JSON.parse(localStorage.getItem('draft_turbine')) || {}, activeArea = "", activeIdx = 0;
 
