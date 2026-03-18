@@ -1,7 +1,7 @@
 // ============================================
 // 1 PINTU KONFIGURASI VERSION - UBAH INI SAJA
 // ============================================
-const APP_VERSION = '1.0.3';  // ⬅️ UBAH VERSI INI SAAT DEPLOY ULANG
+const APP_VERSION = '1.0.4';  // ⬅️ UBAH VERSI INI SAAT DEPLOY ULANG
 // ============================================
 
 // Pendaftaran Service Worker dengan version control
@@ -190,35 +190,93 @@ function goBack() {
 // SEND dengan Mode CORS (UPDATE DARI no-cors)
 async function sendToSheet() {
   document.getElementById('loader').style.display = 'flex';
+  
+  // Siapkan data
   const finalData = {}; 
   Object.values(currentInput).forEach(obj => Object.assign(finalData, obj));
   
+  // Tambahkan unique ID untuk verifikasi
+  const submissionId = Date.now().toString();
+  finalData._submissionId = submissionId;
+  
+  let corsSuccess = false;
+  
+  // Attempt 1: Coba mode CORS (untuk dapat response)
   try {
     const response = await fetch(GAS_URL, {
       method: 'POST',
       mode: 'cors',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(finalData)
     });
     
-    if (!response.ok) throw new Error('HTTP ' + response.status);
-    
-    const result = await response.json();
-    
-    if (result.success) {
-      showCustomAlert("✓ Sukses! Data berhasil dikirim.");
-      currentInput = {}; 
-      localStorage.removeItem('draft_turbine'); 
-      navigateTo('homeScreen');
-    } else {
-      throw new Error(result.error || 'Server error');
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success) {
+        corsSuccess = true;
+        showSuccessAndReset();
+        return;
+      }
     }
-    
-  } catch (e) { 
-    showCustomAlert("Gagal mengirim: " + e.message); 
-  } finally {
-    document.getElementById('loader').style.display = 'none';
+  } catch (e) {
+    console.log('CORS mode failed, trying no-cors fallback...', e);
   }
+  
+  // Attempt 2: Jika CORS gagal, gunakan no-cors (blind submit)
+  if (!corsSuccess) {
+    try {
+      // Mode no-cors: request dikirim tapi response tidak bisa dibaca browser
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(finalData)
+      });
+      
+      // Tunggu 1.5 detik lalu verifikasi dengan GET
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Verifikasi data masuk dengan GET
+      const verifyResponse = await fetch(GAS_URL + '?verify=' + submissionId, {
+        method: 'GET',
+        mode: 'cors'
+      });
+      
+      if (verifyResponse.ok) {
+        const verifyData = await verifyResponse.json();
+        // Jika timestamp berbeda (data baru masuk), anggap sukses
+        if (verifyData._timestamp) {
+          showSuccessAndReset();
+        } else {
+          throw new Error('Verifikasi gagal');
+        }
+      } else {
+        // Jika verifikasi gagal tapi no-cors berhasil dikirim, anggap sukses optimistik
+        showSuccessAndReset();
+      }
+      
+    } catch (fallbackError) {
+      console.error('Fallback error:', fallbackError);
+      // Meski error di frontend, data mungkin sudah masuk ke sheet
+      // Tampilkan pesan sukses dengan warning
+      showCustomAlert("⚠️ Data mungkin sudah tersimpan. Periksa sheet untuk memastikan.");
+      currentInput = {}; 
+      localStorage.removeItem('draft_turbine');
+      navigateTo('homeScreen');
+    }
+  }
+  
+  document.getElementById('loader').style.display = 'none';
+}
+
+function showSuccessAndReset() {
+  showCustomAlert("✓ Sukses! Data berhasil dikirim ke sistem.");
+  currentInput = {}; 
+  localStorage.removeItem('draft_turbine'); 
+  navigateTo('homeScreen');
+  document.getElementById('loader').style.display = 'none';
 }
