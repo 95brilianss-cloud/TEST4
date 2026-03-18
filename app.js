@@ -94,26 +94,47 @@ function navigateTo(id) {
     if(id === 'areaListScreen') fetchLastData();
 }
 
-function fetchLastData() {
-    const timeout = setTimeout(() => { 
-        document.getElementById('loader').style.display = 'none'; 
-        renderMenu(); 
-    }, 5000); 
-    const cb = 'jsonp_' + Date.now();
-    const s = document.createElement('script');
-    window[cb] = (d) => { 
-        clearTimeout(timeout); 
-        lastData = d; 
-        const status = document.getElementById('statusPill');
+// FETCH dengan Mode CORS (UPDATE DARI JSONP)
+async function fetchLastData() {
+    document.getElementById('loader').style.display = 'flex';
+    const status = document.getElementById('statusPill');
+    
+    try {
+        const response = await fetch(GAS_URL + '?v=' + Date.now(), {
+            method: 'GET',
+            mode: 'cors',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        
+        const data = await response.json();
+        lastData = data;
+        
+        // Update status online
         status.innerText = "Online"; 
         status.style.background = "#dcfce7"; 
-        status.style.color = "#166534"; 
-        delete window[cb]; s.remove(); 
-        renderMenu(); 
-    };
-    s.src = `${GAS_URL}?callback=${cb}`;
-    s.onerror = () => { clearTimeout(timeout); renderMenu(); };
-    document.body.appendChild(s);
+        status.style.color = "#166534";
+        
+        // Cek versi jika tersedia
+        if (data._version && data._version !== APP_VERSION) {
+            console.log('Version mismatch detected');
+        }
+        
+    } catch (error) {
+        console.error('Fetch error:', error);
+        status.innerText = "Offline"; 
+        status.style.background = "#fee2e2"; 
+        status.style.color = "#991b1b";
+        showCustomAlert("Gagal terhubung ke server. Menggunakan mode offline.");
+    } finally {
+        document.getElementById('loader').style.display = 'none';
+        renderMenu();
+    }
 }
 
 function renderMenu() {
@@ -176,19 +197,42 @@ function goBack() {
     }
 }
 
+// SEND dengan Mode CORS (UPDATE DARI no-cors)
 async function sendToSheet() {
     document.getElementById('loader').style.display = 'flex';
     const finalData = {}; 
     Object.values(currentInput).forEach(obj => Object.assign(finalData, obj));
+    
     try {
-        await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(finalData) });
-        showCustomAlert("✓ Sukses! Data berhasil dikirim ke sistem.");
-        currentInput = {}; 
-        localStorage.removeItem('draft_turbine'); 
-        navigateTo('homeScreen');
+        const response = await fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'cors',  // ← SEKARANG MENGGUNAKAN CORS
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(finalData)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Server error: ' + response.status);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showCustomAlert("✓ Sukses! " + result.message);
+            currentInput = {}; 
+            localStorage.removeItem('draft_turbine'); 
+            navigateTo('homeScreen');
+        } else {
+            throw new Error(result.error || 'Unknown error');
+        }
+        
     } catch (e) { 
-        showCustomAlert("Gagal mengirim! Periksa koneksi internet Anda."); 
+        console.error('Error:', e);
+        showCustomAlert("Gagal mengirim: " + e.message); 
+    } finally {
+        document.getElementById('loader').style.display = 'none';
     }
-    document.getElementById('loader').style.display = 'none';
 }
-
