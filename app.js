@@ -1,7 +1,7 @@
 // ============================================
 // 1 PINTU KONFIGURASI VERSION - UBAH INI SAJA
 // ============================================
-const APP_VERSION = '1.0.2';  // ⬅️ UBAH VERSI INI SAAT DEPLOY ULANG
+const APP_VERSION = '1.0.3';  // ⬅️ UBAH VERSI INI SAAT DEPLOY ULANG
 // ============================================
 
 // Pendaftaran Service Worker dengan version control
@@ -54,7 +54,7 @@ const AREAS = {
 };
 
 // URL Google Apps Script (hardcoded, tidak bisa diubah dari UI)
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzofpxOD2tpB4IQeL4uUeSoKfJeHzAt3VjACo2wHwrLCmW5Dlo973wadOKDUl_MigK4pQ/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwP8jPt3F7f_i9n11MjkkuzufqanpO1PGrwbwZdTgImrj7isj0AqilG3d8C5IyGgnoaGg/exec";
 
 let lastData = {}, currentInput = JSON.parse(localStorage.getItem('draft_turbine')) || {}, activeArea = "", activeIdx = 0;
 
@@ -96,45 +96,35 @@ function navigateTo(id) {
 
 // FETCH dengan Mode CORS (UPDATE DARI JSONP)
 async function fetchLastData() {
-    document.getElementById('loader').style.display = 'flex';
-    const status = document.getElementById('statusPill');
+  document.getElementById('loader').style.display = 'flex';
+  const status = document.getElementById('statusPill');
+  
+  try {
+    // Tambahkan cache buster
+    const response = await fetch(GAS_URL + '?cb=' + Date.now(), {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-cache'
+    });
     
-    try {
-        const response = await fetch(GAS_URL + '?v=' + Date.now(), {
-            method: 'GET',
-            mode: 'cors',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        
-        const data = await response.json();
-        lastData = data;
-        
-        // Update status online
-        status.innerText = "Online"; 
-        status.style.background = "#dcfce7"; 
-        status.style.color = "#166534";
-        
-        // Cek versi jika tersedia
-        if (data._version && data._version !== APP_VERSION) {
-            console.log('Version mismatch detected');
-        }
-        
-    } catch (error) {
-        console.error('Fetch error:', error);
-        status.innerText = "Offline"; 
-        status.style.background = "#fee2e2"; 
-        status.style.color = "#991b1b";
-        showCustomAlert("Gagal terhubung ke server. Menggunakan mode offline.");
-    } finally {
-        document.getElementById('loader').style.display = 'none';
-        renderMenu();
-    }
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    
+    const data = await response.json();
+    lastData = data;
+    
+    status.innerText = "Online"; 
+    status.style.background = "#dcfce7"; 
+    status.style.color = "#166534";
+    
+  } catch (error) {
+    console.error('Fetch error:', error);
+    status.innerText = "Offline"; 
+    status.style.background = "#fee2e2"; 
+    status.style.color = "#991b1b";
+  } finally {
+    document.getElementById('loader').style.display = 'none';
+    renderMenu();
+  }
 }
 
 function renderMenu() {
@@ -199,40 +189,36 @@ function goBack() {
 
 // SEND dengan Mode CORS (UPDATE DARI no-cors)
 async function sendToSheet() {
-    document.getElementById('loader').style.display = 'flex';
-    const finalData = {}; 
-    Object.values(currentInput).forEach(obj => Object.assign(finalData, obj));
+  document.getElementById('loader').style.display = 'flex';
+  const finalData = {}; 
+  Object.values(currentInput).forEach(obj => Object.assign(finalData, obj));
+  
+  try {
+    const response = await fetch(GAS_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(finalData)
+    });
     
-    try {
-        const response = await fetch(GAS_URL, {
-            method: 'POST',
-            mode: 'cors',  // ← SEKARANG MENGGUNAKAN CORS
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(finalData)
-        });
-        
-        if (!response.ok) {
-            throw new Error('Server error: ' + response.status);
-        }
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showCustomAlert("✓ Sukses! " + result.message);
-            currentInput = {}; 
-            localStorage.removeItem('draft_turbine'); 
-            navigateTo('homeScreen');
-        } else {
-            throw new Error(result.error || 'Unknown error');
-        }
-        
-    } catch (e) { 
-        console.error('Error:', e);
-        showCustomAlert("Gagal mengirim: " + e.message); 
-    } finally {
-        document.getElementById('loader').style.display = 'none';
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      showCustomAlert("✓ Sukses! Data berhasil dikirim.");
+      currentInput = {}; 
+      localStorage.removeItem('draft_turbine'); 
+      navigateTo('homeScreen');
+    } else {
+      throw new Error(result.error || 'Server error');
     }
+    
+  } catch (e) { 
+    showCustomAlert("Gagal mengirim: " + e.message); 
+  } finally {
+    document.getElementById('loader').style.display = 'none';
+  }
 }
