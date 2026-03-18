@@ -1,7 +1,7 @@
 // ============================================
 // 1 PINTU KONFIGURASI VERSION - UBAH INI SAJA
 // ============================================
-const APP_VERSION = '1.0.4';  // ⬅️ UBAH VERSI INI SAAT DEPLOY ULANG
+const APP_VERSION = '1.0.5';  // ⬅️ UBAH VERSI INI SAAT DEPLOY ULANG
 // ============================================
 
 // Pendaftaran Service Worker dengan version control
@@ -54,7 +54,7 @@ const AREAS = {
 };
 
 // URL Google Apps Script (hardcoded, tidak bisa diubah dari UI)
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwP8jPt3F7f_i9n11MjkkuzufqanpO1PGrwbwZdTgImrj7isj0AqilG3d8C5IyGgnoaGg/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxGNivHTIl2wO6j337KWfVOHicxHGIkgfmt5WrYlne96t4cIMfUZmncmIUOILGMVr_EAw/exec";
 
 let lastData = {}, currentInput = JSON.parse(localStorage.getItem('draft_turbine')) || {}, activeArea = "", activeIdx = 0;
 
